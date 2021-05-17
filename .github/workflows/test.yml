@@ -1,0 +1,31 @@
+name: test
+on: push
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    container: golang:1.15
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run Unit Tests
+        run: |
+          make test
+          bash -c '/bin/bash <(curl -s https://codecov.io/bash)'
+      - name: Build executable
+        run: go build -v .
+  license-check:
+    runs-on: ubuntu-latest
+    container: golang:1.15
+    steps:
+    - uses: actions/checkout@v2
+    - name: Download License Utility
+      run: go get -u github.com/google/addlicense
+    - name: Check License Headers
+      run: |
+        shopt -s globstar
+        addlicense -check **/*.{go,proto}
+      shell: bash

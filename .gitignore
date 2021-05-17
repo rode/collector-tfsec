@@ -1,0 +1,4 @@
+.idea/
+*.out
+coverage.txt
+*.test
