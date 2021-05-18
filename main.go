@@ -27,6 +27,8 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/soheilhy/cmux"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/rode/collector-tfsec/proto/v1alpha1"
 	"github.com/rode/collector-tfsec/server"
@@ -87,22 +89,33 @@ func main() {
 	healthzServer := server.NewHealthzServer(logger.Named("healthz"))
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthzServer)
 
-	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
-			logger.Fatal("failed to serve", zap.Error(err))
-		}
-	}()
+	mux := cmux.New(lis)
+	grpcListener := mux.Match(cmux.HTTP2())
+	httpListener := mux.Match(cmux.HTTP1())
 
-	httpServer, err := createGrpcGateway(context.Background(), lis.Addr().String(), fmt.Sprintf(":%d", conf.Port))
+
+	grpcGateway, err := createGrpcGateway(context.Background(), lis.Addr().String())
 	if err != nil {
 		logger.Fatal("failed to start gateway", zap.Error(err))
 	}
 
-	go func() {
-		if err := httpServer.ListenAndServe(); err != nil {
-			logger.Fatal("failed to start serve on http port", zap.Error(err))
-		}
-	}()
+	httpMux := http.NewServeMux()
+	httpMux.Handle("/", grpcGateway)
+
+	httpServer := &http.Server{
+		Handler: httpMux,
+	}
+
+	servers := new(errgroup.Group)
+	servers.Go(func() error {
+		return grpcServer.Serve(grpcListener)
+	})
+	servers.Go(func() error {
+		return httpServer.Serve(httpListener)
+	})
+	servers.Go(func() error {
+		return mux.Serve()
+	})
 
 	logger.Info("listening", zap.String("host", lis.Addr().String()))
 	healthzServer.Ready()
@@ -119,11 +132,10 @@ func main() {
 	httpServer.Shutdown(context.Background())
 }
 
-func createGrpcGateway(ctx context.Context, grpcAddress, httpPort string) (*http.Server, error) {
+func createGrpcGateway(ctx context.Context, grpcAddress string) (http.Handler, error) {
 	conn, err := grpc.DialContext(
 		context.Background(),
 		grpcAddress,
-		grpc.WithBlock(),
 		grpc.WithInsecure(),
 	)
 	if err != nil {
@@ -134,10 +146,7 @@ func createGrpcGateway(ctx context.Context, grpcAddress, httpPort string) (*http
 		return nil, err
 	}
 
-	return &http.Server{
-		Addr:    httpPort,
-		Handler: gwmux,
-	}, nil
+	return http.Handler(gwmux), nil
 }
 
 func createLogger(debug bool) (*zap.Logger, error) {

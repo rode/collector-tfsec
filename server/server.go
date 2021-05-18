@@ -23,7 +23,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
 type tfsecCollector struct {
 	logger *zap.Logger
 	rode   pb.RodeClient
