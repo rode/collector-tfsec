@@ -51,14 +51,21 @@ func NewTfsecCollector(logger *zap.Logger, rode pb.RodeClient) *tfsecCollector {
 }
 
 func (tf *tfsecCollector) CreateScan(ctx context.Context, request *v1alpha1.CreateScanRequest) (*empty.Empty, error) {
+	log := tf.logger.Named("CreateScan")
+
+	log.Info("Received request")
 	repoUrl, err := url.ParseRequestURI(request.Repository)
 	if err != nil {
+		log.Error("Invalid repository uri")
 		return nil, status.Errorf(codes.InvalidArgument, "invalid repository url: %s", err)
 	}
 
 	if err := validateCreateScanRequest(request); err != nil {
+		log.Error("invalid request")
 		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %s", err)
 	}
+
+	log.Info(fmt.Sprintf("Found %d vulnerabilities in scan output", len(request.Results)))
 
 	// strip http/https scheme
 	request.Repository = repoUrl.Host + repoUrl.Path
@@ -75,14 +82,17 @@ func (tf *tfsecCollector) CreateScan(ctx context.Context, request *v1alpha1.Crea
 		occurrences = append(occurrences, vuln)
 	}
 
+	log.Debug("calling Rode")
 	_, err = tf.rode.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
 		Occurrences: occurrences,
 	})
 
 	if err != nil {
+		log.Error("Error creating occurrences", zap.Error(err))
 		return nil, status.Errorf(codes.Internal, "error creating occurrences: %s", err)
 	}
 
+	log.Info("successfully created occurrences")
 	return &empty.Empty{}, nil
 }
 
