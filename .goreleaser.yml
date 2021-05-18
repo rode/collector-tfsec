@@ -14,7 +14,6 @@ dockers:
       - "ghcr.io/rode/collector-tfsec:latest"
       - "ghcr.io/rode/collector-tfsec:{{ .Tag }}"
       - "ghcr.io/rode/collector-tfsec:v{{ .Major }}"
-      - "ghcr.io/rode/collector-tfsec:v{{ .Major }}"
       - "ghcr.io/rode/collector-tfsec:v{{ .Major }}.{{ .Minor }}"
     extra_files:
       - "go.mod"
