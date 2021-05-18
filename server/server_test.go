@@ -175,7 +175,6 @@ var _ = Describe("Server", func() {
 				}
 			})
 
-
 			It("should remove the directory from the source code locations", func() {
 				_, actualRequest, _ := rodeClient.BatchCreateOccurrencesArgsForCall(0)
 				vuln := actualRequest.Occurrences[2].GetVulnerability()
