@@ -74,7 +74,7 @@ func (tf *tfsecCollector) CreateScan(ctx context.Context, request *v1alpha1.Crea
 func createDiscoveryOccurrence(request *v1alpha1.CreateScanRequest, status discovery_go_proto.Discovered_AnalysisStatus, createTime *timestamppb.Timestamp) *grafeas_go_proto.Occurrence {
 	return &grafeas_go_proto.Occurrence{
 		Resource: &grafeas_go_proto.Resource{
-			Uri: request.CommitUri,
+			Uri: gitResourceUri(request),
 		},
 		NoteName:   collectorNoteName,
 		Kind:       common_go_proto.NoteKind_DISCOVERY,
@@ -98,7 +98,7 @@ func mapScanResultToVulnOccurrence(request *v1alpha1.CreateScanRequest, violatio
 
 	return &grafeas_go_proto.Occurrence{
 		Resource: &grafeas_go_proto.Resource{
-			Uri: request.CommitUri,
+			Uri: gitResourceUri(request),
 		},
 		NoteName:   collectorNoteName,
 		Kind:       common_go_proto.NoteKind_VULNERABILITY,
@@ -113,6 +113,10 @@ func mapScanResultToVulnOccurrence(request *v1alpha1.CreateScanRequest, violatio
 			},
 		},
 	}
+}
+
+func gitResourceUri(request *v1alpha1.CreateScanRequest) string {
+	return fmt.Sprintf("git://%s@%s", request.Repository, request.CommitId)
 }
 
 func writeSentence(b *strings.Builder, message string) {
@@ -142,7 +146,7 @@ func mapSeverity(severity string) vulnerability_go_proto.Severity {
 }
 
 func mapPackageIssue(request *v1alpha1.CreateScanRequest, violation *v1alpha1.TfsecScanRuleViolation) []*vulnerability_go_proto.PackageIssue {
-	location := strings.TrimPrefix(violation.Location.Filename, request.PathPrefix+"/")
+	location := strings.TrimPrefix(violation.Location.Filename, request.ScanDirectory+"/")
 
 	return []*vulnerability_go_proto.PackageIssue{
 		{

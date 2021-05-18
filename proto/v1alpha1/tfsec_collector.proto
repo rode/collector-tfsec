@@ -50,7 +50,12 @@ message TfsecScanRuleViolation {
 }
 
 message CreateScanRequest {
-  string commit_uri = 1;
-  string path_prefix = 2;
-  repeated TfsecScanRuleViolation results = 3;
+  // commit_id is the Git SHA of the Terraform source code
+  string commit_id = 1;
+  // a link to the source code
+  string repository = 2;
+  // the absolute path to the Terraform source code. Used to normalize the scan results
+  string scan_directory = 3;
+  // tfsec scan output
+  repeated TfsecScanRuleViolation results = 4;
 }
