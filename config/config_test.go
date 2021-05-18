@@ -29,8 +29,7 @@ var _ = Describe("Config", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(c).To(BeNil())
 		},
-			Entry("bad grpc port", []string{"--grpc-port=foo"}),
-			Entry("bad http port", []string{"--http-port=bar"}),
+			Entry("bad port", []string{"--port=foo"}),
 			Entry("bad debug", []string{"--debug=baz"}),
 		)
 
@@ -41,25 +40,22 @@ var _ = Describe("Config", func() {
 			Expect(c).To(Equal(expected))
 		},
 			Entry("default config", []string{}, &Config{
-				GrpcPort: 1233,
-				HttpPort: 1234,
-				Debug:    false,
+				Port:  8083,
+				Debug: false,
 				RodeConfig: &RodeConfig{
 					Host: "rode:50051",
 				},
 			}),
 			Entry("Rode host flag", []string{"--rode-host=bar"}, &Config{
-				GrpcPort: 1233,
-				HttpPort: 1234,
-				Debug:    false,
+				Port:  8083,
+				Debug: false,
 				RodeConfig: &RodeConfig{
 					Host: "bar",
 				},
 			}),
 			Entry("Rode insecure flag", []string{"--rode-insecure=true"}, &Config{
-				GrpcPort: 1233,
-				HttpPort: 1234,
-				Debug:    false,
+				Port:  8083,
+				Debug: false,
 				RodeConfig: &RodeConfig{
 					Host:     "rode:50051",
 					Insecure: true,

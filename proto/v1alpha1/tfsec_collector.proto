@@ -1,0 +1,55 @@
+// Copyright 2021 The Rode Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package tfsec_collector.v1alpha1;
+
+option go_package = "github.com/rode/collector-tfsec/proto/v1alpha1";
+
+import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service TfsecCollector {
+  rpc CreateScan(CreateScanRequest) returns (google.protobuf.Empty)  {
+    option (google.api.http) = {
+      post: "/v1alpha1/scans"
+      body: "*"
+    };
+  }
+};
+
+message SourceCodeLocation {
+  string filename = 1;
+  int32 start_line = 2;
+  int32 end_line = 3;
+}
+
+message TfsecScanRuleViolation {
+  string rule_id = 1;
+  string rule_description = 2;
+  string rule_provider = 3;
+  string link = 4;
+  SourceCodeLocation location = 5;
+  string description = 6;
+  string impact = 7;
+  string resolution = 8;
+  string severity = 9;
+  bool passed = 10;
+}
+
+message CreateScanRequest {
+  repeated TfsecScanRuleViolation results = 1;
+}

@@ -1,6 +1,6 @@
-module github.com/rode/new-collector-template
+module github.com/rode/collector-tfsec
 
-go 1.15
+go 1.16
 
 require (
 	github.com/brianvoe/gofakeit/v6 v6.0.0

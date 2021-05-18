@@ -28,8 +28,8 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 
-	"github.com/rode/new-collector-template/proto/v1alpha1"
-	"github.com/rode/new-collector-template/server"
+	"github.com/rode/collector-tfsec/proto/v1alpha1"
+	"github.com/rode/collector-tfsec/server"
 	pb "github.com/rode/rode/proto/v1alpha1"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -37,7 +37,7 @@ import (
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/rode/new-collector-template/config"
+	"github.com/rode/collector-tfsec/config"
 )
 
 func main() {
@@ -51,7 +51,7 @@ func main() {
 		log.Fatalf("failed to create logger: %v", err)
 	}
 
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.GrpcPort))
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", conf.Port))
 	if err != nil {
 		logger.Fatal("failed to listen", zap.Error(err))
 	}
@@ -81,8 +81,8 @@ func main() {
 		reflection.Register(grpcServer)
 	}
 
-	collectorServer := server.NewNewCollectorTemplateServer(logger, rodeClient)
-	v1alpha1.RegisterNewCollectorTemplateServer(grpcServer, collectorServer)
+	collectorServer := server.NewTfsecCollector(logger, rodeClient)
+	v1alpha1.RegisterTfsecCollectorServer(grpcServer, collectorServer)
 
 	healthzServer := server.NewHealthzServer(logger.Named("healthz"))
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthzServer)
@@ -93,7 +93,7 @@ func main() {
 		}
 	}()
 
-	httpServer, err := createGrpcGateway(context.Background(), lis.Addr().String(), fmt.Sprintf(":%d", conf.HttpPort))
+	httpServer, err := createGrpcGateway(context.Background(), lis.Addr().String(), fmt.Sprintf(":%d", conf.Port))
 	if err != nil {
 		logger.Fatal("failed to start gateway", zap.Error(err))
 	}
@@ -130,7 +130,7 @@ func createGrpcGateway(ctx context.Context, grpcAddress, httpPort string) (*http
 		log.Fatalln("Failed to dial server:", err)
 	}
 	gwmux := runtime.NewServeMux()
-	if err := v1alpha1.RegisterNewCollectorTemplateHandler(ctx, gwmux, conn); err != nil {
+	if err := v1alpha1.RegisterTfsecCollectorHandler(ctx, gwmux, conn); err != nil {
 		return nil, err
 	}
 

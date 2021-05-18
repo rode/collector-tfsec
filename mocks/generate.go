@@ -12,27 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-syntax = "proto3";
+package mocks
 
-package new_collector_template.v1alpha1;
-
-option go_package = "github.com/rode/new-collector-template/proto/v1alpha1";
-
-import "google/api/annotations.proto";
-
-service NewCollectorTemplate {
-  rpc CreateEventOccurrence(CreateEventOccurrenceRequest) returns (CreateEventOccurrenceResponse) {
-    option (google.api.http) = {
-      post: "/v1alpha1/events"
-      body: "*"
-    };
-  }
-}
-
-message CreateEventOccurrenceRequest {
-  string name = 1;
-}
-
-message CreateEventOccurrenceResponse {
-  string id = 2;
-}
+//go:generate counterfeiter -o rode.go github.com/rode/rode/proto/v1alpha1.RodeClient

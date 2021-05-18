@@ -35,7 +35,7 @@ var _ = Describe("Server", func() {
 		ctx        context.Context
 		mockCtrl   *gomock.Controller
 		rodeClient *mocks.MockRodeClient
-		server     *NewCollectorTemplateServer
+		server     *tfsecCollector
 	)
 
 	BeforeEach(func() {
@@ -43,7 +43,7 @@ var _ = Describe("Server", func() {
 		mockCtrl = gomock.NewController(GinkgoT())
 		rodeClient = mocks.NewMockRodeClient(mockCtrl)
 
-		server = NewNewCollectorTemplateServer(logger, rodeClient)
+		server = NewTfsecCollector(logger, rodeClient)
 	})
 
 	AfterEach(func() {
