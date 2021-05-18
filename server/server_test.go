@@ -18,6 +18,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	. "github.com/onsi/ginkgo"
@@ -159,6 +160,28 @@ var _ = Describe("Server", func() {
 				_, actualRequest, _ := rodeClient.BatchCreateOccurrencesArgsForCall(0)
 
 				Expect(actualRequest.Occurrences).To(HaveLen(2))
+			})
+		})
+
+		When("a scan directory is passed", func() {
+			var expectedFilename string
+			BeforeEach(func() {
+				expectedFilename = fake.Word()
+				request.ScanDirectory = fake.Word()
+				violation := randomTfsecScanRuleViolation()
+				violation.Location.Filename = filepath.Join(request.ScanDirectory, expectedFilename)
+				request.Results = []*v1alpha1.TfsecScanRuleViolation{
+					violation,
+				}
+			})
+
+
+			It("should remove the directory from the source code locations", func() {
+				_, actualRequest, _ := rodeClient.BatchCreateOccurrencesArgsForCall(0)
+				vuln := actualRequest.Occurrences[2].GetVulnerability()
+
+				Expect(vuln.PackageIssue[0].AffectedLocation.Package).To(Equal(expectedFilename))
+				Expect(vuln.PackageIssue[0].AffectedLocation.Version.Name).To(Equal(expectedFilename))
 			})
 		})
 
