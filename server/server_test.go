@@ -16,121 +16,39 @@ package server
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/rode/new-collector-template/mocks"
-	"github.com/rode/new-collector-template/proto/v1alpha1"
-	pb "github.com/rode/rode/proto/v1alpha1"
-	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/common_go_proto"
-	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/grafeas_go_proto"
-	"google.golang.org/grpc/codes"
+	"github.com/rode/collector-tfsec/mocks"
+	"github.com/rode/collector-tfsec/proto/v1alpha1"
 	"google.golang.org/grpc/status"
 )
 
 var _ = Describe("Server", func() {
 	var (
-		ctx        context.Context
-		mockCtrl   *gomock.Controller
-		rodeClient *mocks.MockRodeClient
+		ctx        = context.Background()
+		rodeClient *mocks.FakeRodeClient
 		server     *tfsecCollector
 	)
 
 	BeforeEach(func() {
-		ctx = context.Background()
-		mockCtrl = gomock.NewController(GinkgoT())
-		rodeClient = mocks.NewMockRodeClient(mockCtrl)
+		rodeClient = &mocks.FakeRodeClient{}
 
 		server = NewTfsecCollector(logger, rodeClient)
-	})
-
-	AfterEach(func() {
-		mockCtrl.Finish()
 	})
 
 	Describe("CreateEventOccurrence", func() {
 		var (
 			actualError error
-			request     *v1alpha1.CreateEventOccurrenceRequest
-			response    *v1alpha1.CreateEventOccurrenceResponse
+			request     *v1alpha1.CreateScanRequest
 		)
 
 		BeforeEach(func() {
-			request = &v1alpha1.CreateEventOccurrenceRequest{
-				Name: fake.LetterN(10),
-			}
+			request = &v1alpha1.CreateScanRequest{}
 		})
 
 		JustBeforeEach(func() {
-			response, actualError = server.CreateEventOccurrence(ctx, request)
-		})
-
-		Describe("the occurrence is created successfully", func() {
-			var (
-				expectedOccurrenceId string
-				actualBatchRequest   *pb.BatchCreateOccurrencesRequest
-			)
-
-			BeforeEach(func() {
-				expectedOccurrenceId = fake.LetterN(10)
-				newOccurrence := &grafeas_go_proto.Occurrence{
-					Name: expectedOccurrenceId,
-				}
-
-				rodeClient.EXPECT().
-					BatchCreateOccurrences(ctx, gomock.Any()).
-					Do(func(_ context.Context, r *pb.BatchCreateOccurrencesRequest) {
-						actualBatchRequest = r
-					}).
-					Return(&pb.BatchCreateOccurrencesResponse{Occurrences: []*grafeas_go_proto.Occurrence{newOccurrence}}, nil).
-					Times(1)
-			})
-
-			It("should not return an error", func() {
-				Expect(actualError).To(BeNil())
-			})
-
-			It("should create a build occurrence", func() {
-				actualOccurrence := actualBatchRequest.Occurrences[0]
-
-				Expect(actualOccurrence.Resource.Uri).To(Equal("github.com/rode/rode@bca0e1b89be42a61131b6de09fd2836e7b00c252"))
-				Expect(actualOccurrence.NoteName).To(Equal("projects/rode/notes/new_collector_template"))
-				Expect(actualOccurrence.Kind).To(Equal(common_go_proto.NoteKind_BUILD))
-				Expect(actualOccurrence.GetBuild().Provenance.Id).To(Equal(request.Name))
-				Expect(actualOccurrence.GetBuild().Provenance.ProjectId).To(Equal("projects/rode"))
-			})
-
-			It("should return the new occurrence id", func() {
-				Expect(response.Id).To(Equal(expectedOccurrenceId))
-			})
-		})
-
-		Describe("an error occurs creating the occurrence", func() {
-			var (
-				expectedError error
-			)
-
-			BeforeEach(func() {
-				expectedError = fmt.Errorf(fake.Word())
-				rodeClient.EXPECT().
-					BatchCreateOccurrences(gomock.Any(), gomock.Any()).
-					Return(nil, expectedError).
-					Times(1)
-			})
-
-			It("should return an error", func() {
-				Expect(actualError).To(HaveOccurred())
-				Expect(response).To(BeNil())
-			})
-
-			It("should set the status to internal server error", func() {
-				s := getGRPCStatusFromError(actualError)
-
-				Expect(s.Code()).To(Equal(codes.Internal))
-				Expect(s.Message()).To(Equal(fmt.Sprintf("Error creating occurrence: %s", expectedError)))
-			})
+			_, actualError = server.CreateScan(ctx, request)
 		})
 	})
 })

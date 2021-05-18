@@ -20,7 +20,6 @@ option go_package = "github.com/rode/collector-tfsec/proto/v1alpha1";
 
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
-import "google/protobuf/timestamp.proto";
 
 service TfsecCollector {
   rpc CreateScan(CreateScanRequest) returns (google.protobuf.Empty)  {
@@ -51,5 +50,7 @@ message TfsecScanRuleViolation {
 }
 
 message CreateScanRequest {
-  repeated TfsecScanRuleViolation results = 1;
+  string commit_uri = 1;
+  string path_prefix = 2;
+  repeated TfsecScanRuleViolation results = 3;
 }
