@@ -17,6 +17,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/golang/protobuf/ptypes/empty"
@@ -28,6 +29,8 @@ import (
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/package_go_proto"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/vulnerability_go_proto"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -48,6 +51,18 @@ func NewTfsecCollector(logger *zap.Logger, rode pb.RodeClient) *tfsecCollector {
 }
 
 func (tf *tfsecCollector) CreateScan(ctx context.Context, request *v1alpha1.CreateScanRequest) (*empty.Empty, error) {
+	repoUrl, err := url.ParseRequestURI(request.Repository)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid repository url: %s", err)
+	}
+
+	if err := validateCreateScanRequest(request); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %s", err)
+	}
+
+	// strip http/https scheme
+	request.Repository = repoUrl.Host + repoUrl.Path
+
 	createTime := timestamppb.Now()
 
 	occurrences := []*grafeas_go_proto.Occurrence{
@@ -60,12 +75,12 @@ func (tf *tfsecCollector) CreateScan(ctx context.Context, request *v1alpha1.Crea
 		occurrences = append(occurrences, vuln)
 	}
 
-	_, err := tf.rode.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
+	_, err = tf.rode.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
 		Occurrences: occurrences,
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("error creating occurrences: %s", err)
+		return nil, status.Errorf(codes.Internal, "error creating occurrences: %s", err)
 	}
 
 	return &empty.Empty{}, nil
@@ -92,9 +107,11 @@ func createDiscoveryOccurrence(request *v1alpha1.CreateScanRequest, status disco
 func mapScanResultToVulnOccurrence(request *v1alpha1.CreateScanRequest, violation *v1alpha1.TfsecScanRuleViolation, createTime *timestamppb.Timestamp) *grafeas_go_proto.Occurrence {
 	var b strings.Builder
 
-	writeSentence(&b, violation.Description)
-	writeSentence(&b, violation.Impact)
-	writeSentence(&b, violation.Resolution)
+	writeParagraph(&b, []string{
+		violation.Description,
+		violation.Impact,
+		violation.Resolution,
+	})
 
 	return &grafeas_go_proto.Occurrence{
 		Resource: &grafeas_go_proto.Resource{
@@ -105,8 +122,7 @@ func mapScanResultToVulnOccurrence(request *v1alpha1.CreateScanRequest, violatio
 		CreateTime: createTime,
 		Details: &grafeas_go_proto.Occurrence_Vulnerability{
 			Vulnerability: &vulnerability_go_proto.Details{
-				Type:              "git", // TODO: should this be "terraform"?
-				Severity:          mapSeverity(violation.Severity),
+				Type:              "git",
 				EffectiveSeverity: mapSeverity(violation.Severity),
 				ShortDescription:  b.String(),
 				PackageIssue:      mapPackageIssue(request, violation),
@@ -119,14 +135,25 @@ func gitResourceUri(request *v1alpha1.CreateScanRequest) string {
 	return fmt.Sprintf("git://%s@%s", request.Repository, request.CommitId)
 }
 
-func writeSentence(b *strings.Builder, message string) {
-	b.WriteString(message)
-
-	if !strings.HasSuffix(message, ".") {
-		b.WriteByte('.')
+func validateCreateScanRequest(request *v1alpha1.CreateScanRequest) error {
+	if request.CommitId == "" {
+		return fmt.Errorf("commit id must be set")
 	}
 
-	b.WriteByte(' ')
+	return nil
+}
+
+func writeParagraph(b *strings.Builder, messages []string) {
+	for i, message := range messages {
+		b.WriteString(message)
+		if !strings.HasSuffix(message, ".") {
+			b.WriteByte('.')
+		}
+
+		if i != len(messages)-1 {
+			b.WriteByte(' ')
+		}
+	}
 }
 
 // map tfsec severity levels to Grafeas levels

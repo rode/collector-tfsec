@@ -93,7 +93,6 @@ func main() {
 	grpcListener := mux.Match(cmux.HTTP2())
 	httpListener := mux.Match(cmux.HTTP1())
 
-
 	grpcGateway, err := createGrpcGateway(context.Background(), lis.Addr().String())
 	if err != nil {
 		logger.Fatal("failed to start gateway", zap.Error(err))
