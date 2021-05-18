@@ -20,7 +20,6 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/rode/collector-tfsec/proto/v1alpha1"
 	pb "github.com/rode/rode/proto/v1alpha1"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/common_go_proto"
@@ -49,16 +48,16 @@ func NewTfsecCollector(logger *zap.Logger, rode pb.RodeClient) *tfsecCollector {
 }
 
 func (tf *tfsecCollector) CreateScan(ctx context.Context, request *v1alpha1.CreateScanRequest) (*empty.Empty, error) {
-	scanStart := createDiscoveryOccurrence(request, discovery_go_proto.Discovered_SCANNING)
-	scanEnd := createDiscoveryOccurrence(request, discovery_go_proto.Discovered_FINISHED_SUCCESS)
-	scanEnd.CreateTime = scanStart.CreateTime
+	createTime := timestamppb.Now()
+
 	occurrences := []*grafeas_go_proto.Occurrence{
-		scanStart,
-		scanEnd,
+		createDiscoveryOccurrence(request, discovery_go_proto.Discovered_SCANNING, createTime),
+		createDiscoveryOccurrence(request, discovery_go_proto.Discovered_FINISHED_SUCCESS, createTime),
 	}
 
 	for _, result := range request.Results {
-		occurrences = append(occurrences, mapScanResultToVulnOccurrence(request, result, scanEnd.CreateTime))
+		vuln := mapScanResultToVulnOccurrence(request, result, createTime)
+		occurrences = append(occurrences, vuln)
 	}
 
 	_, err := tf.rode.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
@@ -66,20 +65,20 @@ func (tf *tfsecCollector) CreateScan(ctx context.Context, request *v1alpha1.Crea
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error creating occurrences: %s", err)
 	}
 
 	return &empty.Empty{}, nil
 }
 
-func createDiscoveryOccurrence(request *v1alpha1.CreateScanRequest, status discovery_go_proto.Discovered_AnalysisStatus) *grafeas_go_proto.Occurrence {
+func createDiscoveryOccurrence(request *v1alpha1.CreateScanRequest, status discovery_go_proto.Discovered_AnalysisStatus, createTime *timestamppb.Timestamp) *grafeas_go_proto.Occurrence {
 	return &grafeas_go_proto.Occurrence{
 		Resource: &grafeas_go_proto.Resource{
 			Uri: request.CommitUri,
 		},
 		NoteName:   collectorNoteName,
 		Kind:       common_go_proto.NoteKind_DISCOVERY,
-		CreateTime: timestamppb.Now(),
+		CreateTime: createTime,
 		Details: &grafeas_go_proto.Occurrence_Discovered{
 			Discovered: &discovery_go_proto.Details{
 				Discovered: &discovery_go_proto.Discovered{
@@ -90,27 +89,43 @@ func createDiscoveryOccurrence(request *v1alpha1.CreateScanRequest, status disco
 	}
 }
 
-func mapScanResultToVulnOccurrence(request *v1alpha1.CreateScanRequest, violation *v1alpha1.TfsecScanRuleViolation, timestamp *timestamp.Timestamp) *grafeas_go_proto.Occurrence {
+func mapScanResultToVulnOccurrence(request *v1alpha1.CreateScanRequest, violation *v1alpha1.TfsecScanRuleViolation, createTime *timestamppb.Timestamp) *grafeas_go_proto.Occurrence {
+	var b strings.Builder
+
+	writeSentence(&b, violation.Description)
+	writeSentence(&b, violation.Impact)
+	writeSentence(&b, violation.Resolution)
+
 	return &grafeas_go_proto.Occurrence{
 		Resource: &grafeas_go_proto.Resource{
 			Uri: request.CommitUri,
 		},
-		CreateTime: timestamp,
 		NoteName:   collectorNoteName,
 		Kind:       common_go_proto.NoteKind_VULNERABILITY,
+		CreateTime: createTime,
 		Details: &grafeas_go_proto.Occurrence_Vulnerability{
 			Vulnerability: &vulnerability_go_proto.Details{
 				Type:              "git", // TODO: should this be "terraform"?
 				Severity:          mapSeverity(violation.Severity),
 				EffectiveSeverity: mapSeverity(violation.Severity),
-				ShortDescription:  violation.Description,
+				ShortDescription:  b.String(),
 				PackageIssue:      mapPackageIssue(request, violation),
 			},
 		},
 	}
 }
 
-// map tfsec severity levels to grafeas levels
+func writeSentence(b *strings.Builder, message string) {
+	b.WriteString(message)
+
+	if !strings.HasSuffix(message, ".") {
+		b.WriteByte('.')
+	}
+
+	b.WriteByte(' ')
+}
+
+// map tfsec severity levels to Grafeas levels
 // tfsec source: https://github.com/tfsec/tfsec/blob/3cb7ae63dd2370439dccad77fc048d17a6225cbc/internal/app/tfsec/scanner/result.go#L25-L29
 // It appears that none of the default rules use the info severity
 func mapSeverity(severity string) vulnerability_go_proto.Severity {
