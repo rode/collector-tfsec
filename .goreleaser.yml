@@ -1,4 +1,4 @@
-project_name: rode-new-collector-template
+project_name: rode-collector-tfsec
 before:
   hooks:
     - go mod download
@@ -11,9 +11,10 @@ builds:
       - darwin
 dockers:
   - image_templates:
-      - "ghcr.io/rode/new-collector-template:latest"
-      - "ghcr.io/rode/new-collector-template:{{ .Tag }}"
-      - "ghcr.io/rode/new-collector-template:v{{ .Major }}"
+      - "ghcr.io/rode/collector-tfsec:latest"
+      - "ghcr.io/rode/collector-tfsec:{{ .Tag }}"
+      - "ghcr.io/rode/collector-tfsec:v{{ .Major }}"
+      - "ghcr.io/rode/collector-tfsec:v{{ .Major }}.{{ .Minor }}"
     extra_files:
       - "go.mod"
       - "go.sum"

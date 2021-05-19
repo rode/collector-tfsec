@@ -16,80 +16,185 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"net/url"
+	"strings"
 
-	"github.com/golang/protobuf/ptypes"
-	"github.com/rode/new-collector-template/proto/v1alpha1"
+	"github.com/golang/protobuf/ptypes/empty"
+	"github.com/rode/collector-tfsec/proto/v1alpha1"
 	pb "github.com/rode/rode/proto/v1alpha1"
-	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/build_go_proto"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/common_go_proto"
+	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/discovery_go_proto"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/grafeas_go_proto"
-	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/provenance_go_proto"
-	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/source_go_proto"
+	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/package_go_proto"
+	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/vulnerability_go_proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
-	rodeProjectId            = "projects/rode"
-	newCollectorTemplateNote = rodeProjectId + "/notes/new_collector_template"
+	collectorNoteName = "projects/rode/notes/tfsec"
 )
 
-type NewCollectorTemplateServer struct {
+type tfsecCollector struct {
 	logger *zap.Logger
 	rode   pb.RodeClient
 }
 
-func NewNewCollectorTemplateServer(logger *zap.Logger, rode pb.RodeClient) *NewCollectorTemplateServer {
-	return &NewCollectorTemplateServer{
+func NewTfsecCollector(logger *zap.Logger, rode pb.RodeClient) *tfsecCollector {
+	return &tfsecCollector{
 		logger,
 		rode,
 	}
 }
 
-func (s *NewCollectorTemplateServer) CreateEventOccurrence(ctx context.Context, request *v1alpha1.CreateEventOccurrenceRequest) (*v1alpha1.CreateEventOccurrenceResponse, error) {
-	log := s.logger.Named("CreateEventOccurrence")
+func (tf *tfsecCollector) CreateScan(ctx context.Context, request *v1alpha1.CreateScanRequest) (*empty.Empty, error) {
+	log := tf.logger.Named("CreateScan")
 
-	log.Debug("received request", zap.Any("request", request))
+	log.Info("Received request")
+	repoUrl, err := url.ParseRequestURI(request.Repository)
+	if err != nil {
+		log.Error("Invalid repository uri")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid repository url: %s", err)
+	}
 
-	o := &grafeas_go_proto.Occurrence{
+	if err := validateCreateScanRequest(request); err != nil {
+		log.Error("invalid request")
+		return nil, status.Errorf(codes.InvalidArgument, "invalid request: %s", err)
+	}
+
+	log.Info(fmt.Sprintf("Found %d vulnerabilities in scan output", len(request.Results)))
+
+	// strip http/https scheme
+	request.Repository = repoUrl.Host + repoUrl.Path
+
+	createTime := timestamppb.Now()
+
+	occurrences := []*grafeas_go_proto.Occurrence{
+		createDiscoveryOccurrence(request, discovery_go_proto.Discovered_SCANNING, createTime),
+		createDiscoveryOccurrence(request, discovery_go_proto.Discovered_FINISHED_SUCCESS, createTime),
+	}
+
+	for _, result := range request.Results {
+		vuln := mapScanResultToVulnOccurrence(request, result, createTime)
+		occurrences = append(occurrences, vuln)
+	}
+
+	log.Debug("calling Rode")
+	_, err = tf.rode.BatchCreateOccurrences(ctx, &pb.BatchCreateOccurrencesRequest{
+		Occurrences: occurrences,
+	})
+
+	if err != nil {
+		log.Error("Error creating occurrences", zap.Error(err))
+		return nil, status.Errorf(codes.Internal, "error creating occurrences: %s", err)
+	}
+
+	log.Info("successfully created occurrences")
+	return &empty.Empty{}, nil
+}
+
+func createDiscoveryOccurrence(request *v1alpha1.CreateScanRequest, status discovery_go_proto.Discovered_AnalysisStatus, createTime *timestamppb.Timestamp) *grafeas_go_proto.Occurrence {
+	return &grafeas_go_proto.Occurrence{
 		Resource: &grafeas_go_proto.Resource{
-			Uri: "github.com/rode/rode@bca0e1b89be42a61131b6de09fd2836e7b00c252",
+			Uri: gitResourceUri(request),
 		},
-		NoteName: newCollectorTemplateNote,
-		Kind:     common_go_proto.NoteKind_BUILD,
-		Details: &grafeas_go_proto.Occurrence_Build{
-			Build: &build_go_proto.Details{
-				Provenance: &provenance_go_proto.BuildProvenance{
-					Id:         request.Name,
-					ProjectId:  rodeProjectId,
-					CreateTime: ptypes.TimestampNow(),
-					SourceProvenance: &provenance_go_proto.Source{
-						Context: &source_go_proto.SourceContext{
-							Context: &source_go_proto.SourceContext_Git{
-								Git: &source_go_proto.GitSourceContext{
-									Url:        "github.com/rode/rode",
-									RevisionId: "bca0e1b89be42a61131b6de09fd2836e7b00c252",
-								}},
-						},
-					},
+		NoteName:   collectorNoteName,
+		Kind:       common_go_proto.NoteKind_DISCOVERY,
+		CreateTime: createTime,
+		Details: &grafeas_go_proto.Occurrence_Discovered{
+			Discovered: &discovery_go_proto.Details{
+				Discovered: &discovery_go_proto.Discovered{
+					ContinuousAnalysis: discovery_go_proto.Discovered_CONTINUOUS_ANALYSIS_UNSPECIFIED,
+					AnalysisStatus:     status,
+				}},
+		},
+	}
+}
+
+func mapScanResultToVulnOccurrence(request *v1alpha1.CreateScanRequest, violation *v1alpha1.TfsecScanRuleViolation, createTime *timestamppb.Timestamp) *grafeas_go_proto.Occurrence {
+	var b strings.Builder
+
+	writeParagraph(&b, []string{
+		violation.Description,
+		violation.Impact,
+		violation.Resolution,
+	})
+
+	return &grafeas_go_proto.Occurrence{
+		Resource: &grafeas_go_proto.Resource{
+			Uri: gitResourceUri(request),
+		},
+		NoteName:   collectorNoteName,
+		Kind:       common_go_proto.NoteKind_VULNERABILITY,
+		CreateTime: createTime,
+		Details: &grafeas_go_proto.Occurrence_Vulnerability{
+			Vulnerability: &vulnerability_go_proto.Details{
+				Type:              "git",
+				EffectiveSeverity: mapSeverity(violation.Severity),
+				ShortDescription:  b.String(),
+				PackageIssue:      mapPackageIssue(request, violation),
+			},
+		},
+	}
+}
+
+func gitResourceUri(request *v1alpha1.CreateScanRequest) string {
+	return fmt.Sprintf("git://%s@%s", request.Repository, request.CommitId)
+}
+
+func validateCreateScanRequest(request *v1alpha1.CreateScanRequest) error {
+	if request.CommitId == "" {
+		return fmt.Errorf("commit id must be set")
+	}
+
+	return nil
+}
+
+func writeParagraph(b *strings.Builder, messages []string) {
+	for i, message := range messages {
+		b.WriteString(message)
+		if !strings.HasSuffix(message, ".") {
+			b.WriteByte('.')
+		}
+
+		if i != len(messages)-1 {
+			b.WriteByte(' ')
+		}
+	}
+}
+
+// map tfsec severity levels to Grafeas levels
+// tfsec source: https://github.com/tfsec/tfsec/blob/3cb7ae63dd2370439dccad77fc048d17a6225cbc/internal/app/tfsec/scanner/result.go#L25-L29
+// It appears that none of the default rules use the info severity
+func mapSeverity(severity string) vulnerability_go_proto.Severity {
+	switch severity {
+	case "ERROR":
+		return vulnerability_go_proto.Severity_HIGH
+	case "WARNING":
+		return vulnerability_go_proto.Severity_MEDIUM
+	case "INFO":
+		return vulnerability_go_proto.Severity_MINIMAL
+	default:
+		return vulnerability_go_proto.Severity_SEVERITY_UNSPECIFIED
+	}
+}
+
+func mapPackageIssue(request *v1alpha1.CreateScanRequest, violation *v1alpha1.TfsecScanRuleViolation) []*vulnerability_go_proto.PackageIssue {
+	location := strings.TrimPrefix(violation.Location.Filename, request.ScanDirectory+"/")
+
+	return []*vulnerability_go_proto.PackageIssue{
+		{
+			AffectedLocation: &vulnerability_go_proto.VulnerabilityLocation{
+				CpeUri:  fmt.Sprintf("https://tfsec.dev/docs/%s/%s/", violation.RuleProvider, violation.RuleId),
+				Package: location,
+				Version: &package_go_proto.Version{
+					Name: location,
+					Kind: package_go_proto.Version_NORMAL,
 				},
 			},
 		},
 	}
-
-	batchRequest := &pb.BatchCreateOccurrencesRequest{
-		Occurrences: []*grafeas_go_proto.Occurrence{o},
-	}
-
-	response, err := s.rode.BatchCreateOccurrences(ctx, batchRequest)
-	if err != nil {
-		log.Error("Error creating occurrence", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "Error creating occurrence: %s", err)
-	}
-
-	log.Info("Occurrence created")
-	return &v1alpha1.CreateEventOccurrenceResponse{
-		Id: response.Occurrences[0].Name,
-	}, nil
 }
