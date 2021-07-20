@@ -1,9 +1,7 @@
-.PHONY: test fmtcheck vet fmt license coverage mocks generate
+.PHONY: test fmtcheck vet fmt license coverage generate
 MAKEFLAGS += --silent
 GOFMT_FILES?=$$(find . -name '*.go' | grep -v proto)
 LICENSE_FILES=$$(find -E . -regex '.*\.(go|proto)')
-
-GO111MODULE=on
 
 generate:
 	docker build ./scripts/generate -t ghcr.io/rode/collector-tfsec/generate:latest
@@ -23,10 +21,6 @@ vet:
 
 coverage: test
 	go tool cover -html=coverage.txt
-
-mocks:
-	go install github.com/maxbrunsfeld/counterfeiter/v6@v6.4.1
-	COUNTERFEITER_NO_GENERATE_WARNING="true" go generate ./...
 
 test: fmtcheck vet
 	go test -v ./... -coverprofile=coverage.txt -covermode atomic

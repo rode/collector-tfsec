@@ -14,34 +14,29 @@
 
 package config
 
-import "flag"
+import (
+	"flag"
+	"github.com/peterbourgon/ff/v3"
+	"github.com/rode/rode/common"
+)
 
 type Config struct {
 	Port       int
 	Debug      bool
-	RodeConfig *RodeConfig
-}
-
-type RodeConfig struct {
-	Host     string
-	Insecure bool
+	ClientConfig *common.ClientConfig
 }
 
 func Build(name string, args []string) (*Config, error) {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
 
 	c := &Config{
-		RodeConfig: &RodeConfig{},
+		ClientConfig: common.SetupRodeClientFlags(flags),
 	}
 
 	flags.IntVar(&c.Port, "port", 8083, "the port that the collector's gRPC service should listen on")
 	flags.BoolVar(&c.Debug, "debug", false, "when set, debug mode will be enabled")
 
-	flags.StringVar(&c.RodeConfig.Host, "rode-host", "rode:50051", "the host to use to connect to rode")
-	flags.BoolVar(&c.RodeConfig.Insecure, "rode-insecure", false, "when set, the connection to rode will not use TLS")
-
-	err := flags.Parse(args)
-	if err != nil {
+	if err := ff.Parse(flags, args, ff.WithEnvVarNoPrefix()); err != nil {
 		return nil, err
 	}
 
