@@ -23,8 +23,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/rode/collector-tfsec/mocks"
 	"github.com/rode/collector-tfsec/proto/v1alpha1"
+	"github.com/rode/rode/proto/v1alpha1fakes"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/common_go_proto"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/discovery_go_proto"
 	"github.com/rode/rode/protodeps/grafeas/proto/v1beta1/package_go_proto"
@@ -36,7 +36,7 @@ import (
 var _ = Describe("Server", func() {
 	var (
 		ctx             = context.Background()
-		rodeClient      *mocks.FakeRodeClient
+		rodeClient      *v1alpha1fakes.FakeRodeClient
 		server          *tfsecCollector
 		severityMapping = map[string]vulnerability_go_proto.Severity{
 			"INFO":    vulnerability_go_proto.Severity_MINIMAL,
@@ -46,7 +46,7 @@ var _ = Describe("Server", func() {
 	)
 
 	BeforeEach(func() {
-		rodeClient = &mocks.FakeRodeClient{}
+		rodeClient = &v1alpha1fakes.FakeRodeClient{}
 
 		server = NewTfsecCollector(logger, rodeClient)
 	})
