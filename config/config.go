@@ -21,8 +21,8 @@ import (
 )
 
 type Config struct {
-	Port       int
-	Debug      bool
+	Port         int
+	Debug        bool
 	ClientConfig *common.ClientConfig
 }
 

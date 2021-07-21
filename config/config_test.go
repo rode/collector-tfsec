@@ -47,7 +47,7 @@ var _ = Describe("Config", func() {
 					Rode: &common.RodeClientConfig{
 						Host: "rode:50051",
 					},
-					OIDCAuth: &common.OIDCAuthConfig{},
+					OIDCAuth:  &common.OIDCAuthConfig{},
 					BasicAuth: &common.BasicAuthConfig{},
 				},
 			}),
@@ -58,7 +58,7 @@ var _ = Describe("Config", func() {
 					Rode: &common.RodeClientConfig{
 						Host: "bar",
 					},
-					OIDCAuth: &common.OIDCAuthConfig{},
+					OIDCAuth:  &common.OIDCAuthConfig{},
 					BasicAuth: &common.BasicAuthConfig{},
 				},
 			}),
@@ -67,10 +67,10 @@ var _ = Describe("Config", func() {
 				Debug: false,
 				ClientConfig: &common.ClientConfig{
 					Rode: &common.RodeClientConfig{
-						Host: "rode:50051",
+						Host:                     "rode:50051",
 						DisableTransportSecurity: true,
 					},
-					OIDCAuth: &common.OIDCAuthConfig{},
+					OIDCAuth:  &common.OIDCAuthConfig{},
 					BasicAuth: &common.BasicAuthConfig{},
 				},
 			}),

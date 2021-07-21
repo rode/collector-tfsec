@@ -27,10 +27,10 @@ import (
 
 var _ = Describe("ProxyAuth", func() {
 	var (
-		ctx context.Context
+		ctx                              context.Context
 		expectedRequireTransportSecurity bool
-		proxyAuth credentials.PerRPCCredentials
-		expectedAuthzHeader string
+		proxyAuth                        credentials.PerRPCCredentials
+		expectedAuthzHeader              string
 	)
 
 	BeforeEach(func() {
@@ -47,7 +47,7 @@ var _ = Describe("ProxyAuth", func() {
 	Describe("GetRequestMetadata", func() {
 		var (
 			actualMetadata map[string]string
-			actualError error
+			actualError    error
 		)
 
 		JustBeforeEach(func() {
