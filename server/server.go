@@ -89,7 +89,7 @@ func (tf *tfsecCollector) CreateScan(ctx context.Context, request *v1alpha1.Crea
 
 	if err != nil {
 		log.Error("Error creating occurrences", zap.Error(err))
-		return nil, status.Errorf(codes.Internal, "error creating occurrences: %s", err)
+		return nil, status.Errorf(status.Code(err), "error creating occurrences: %s", err)
 	}
 
 	log.Info("successfully created occurrences")
