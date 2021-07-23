@@ -14,6 +14,7 @@ fmt:
 	gofmt -w -s $(GOFMT_FILES)
 
 license:
+	go install github.com/google/addlicense@master
 	addlicense -c 'The Rode Authors' $(LICENSE_FILES)
 
 vet:

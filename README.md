@@ -27,5 +27,3 @@ To work with the collector locally, you need a running instance of Rode and its 
    ```
 1. To run the fmt check and tests, use `make test`
 1. To add the required license headers, run `make license`
-    - You may need to run [`go get -u github.com/google/addlicense`](https://github.com/google/addlicense) first
-   
