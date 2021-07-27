@@ -16,7 +16,6 @@ package server
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -225,13 +224,17 @@ var _ = Describe("Server", func() {
 		})
 
 		When("an error occurs creating occurrences", func() {
+			var expectedCode codes.Code
+
 			BeforeEach(func() {
-				rodeClient.BatchCreateOccurrencesReturns(nil, errors.New(fake.Word()))
+				expectedCode = codes.Code(fake.Number(int(codes.Canceled), int(codes.Unauthenticated)))
+
+				rodeClient.BatchCreateOccurrencesReturns(nil, status.Errorf(expectedCode, fake.Word()))
 			})
 
-			It("should return an error", func() {
+			It("should return an error with the same status code", func() {
 				Expect(actualError).To(HaveOccurred())
-				Expect(getGRPCStatusFromError(actualError).Code()).To(Equal(codes.Internal))
+				Expect(getGRPCStatusFromError(actualError).Code()).To(Equal(expectedCode))
 			})
 		})
 
