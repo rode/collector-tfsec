@@ -23,7 +23,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: Download License Utility
-      run: go install github.com/google/addlicense@master
+      run: go install github.com/google/addlicense@v1.0.0
     - name: Check License Headers
       run: |
         shopt -s globstar
