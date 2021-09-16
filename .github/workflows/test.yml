@@ -4,7 +4,7 @@ on: push
 jobs:
   check:
     runs-on: ubuntu-latest
-    container: golang:1.16
+    container: golang:1.17
     steps:
       - uses: actions/checkout@v2
 
@@ -19,11 +19,11 @@ jobs:
         run: go build -v .
   license-check:
     runs-on: ubuntu-latest
-    container: golang:1.16
+    container: golang:1.17
     steps:
     - uses: actions/checkout@v2
     - name: Download License Utility
-      run: go install github.com/google/addlicense@master
+      run: go install github.com/google/addlicense@v1.0.0
     - name: Check License Headers
       run: |
         shopt -s globstar

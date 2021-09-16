@@ -4,10 +4,10 @@ package v1alpha1
 
 import (
 	context "context"
-	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,7 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TfsecCollectorClient interface {
-	CreateScan(ctx context.Context, in *CreateScanRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	CreateScan(ctx context.Context, in *CreateScanRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type tfsecCollectorClient struct {
@@ -30,8 +30,8 @@ func NewTfsecCollectorClient(cc grpc.ClientConnInterface) TfsecCollectorClient {
 	return &tfsecCollectorClient{cc}
 }
 
-func (c *tfsecCollectorClient) CreateScan(ctx context.Context, in *CreateScanRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
-	out := new(empty.Empty)
+func (c *tfsecCollectorClient) CreateScan(ctx context.Context, in *CreateScanRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
 	err := c.cc.Invoke(ctx, "/tfsec_collector.v1alpha1.TfsecCollector/CreateScan", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -43,14 +43,14 @@ func (c *tfsecCollectorClient) CreateScan(ctx context.Context, in *CreateScanReq
 // All implementations should embed UnimplementedTfsecCollectorServer
 // for forward compatibility
 type TfsecCollectorServer interface {
-	CreateScan(context.Context, *CreateScanRequest) (*empty.Empty, error)
+	CreateScan(context.Context, *CreateScanRequest) (*emptypb.Empty, error)
 }
 
 // UnimplementedTfsecCollectorServer should be embedded to have forward compatible implementations.
 type UnimplementedTfsecCollectorServer struct {
 }
 
-func (UnimplementedTfsecCollectorServer) CreateScan(context.Context, *CreateScanRequest) (*empty.Empty, error) {
+func (UnimplementedTfsecCollectorServer) CreateScan(context.Context, *CreateScanRequest) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateScan not implemented")
 }
 
